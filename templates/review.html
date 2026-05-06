@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📝 复习单词 - 背单词</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        
+        header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+        
+        header h1 {
+            font-size: 2em;
+            margin-bottom: 10px;
+        }
+        
+        .back-btn {
+            display: inline-block;
+            color: white;
+            text-decoration: none;
+            padding: 10px 20px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .back-btn:hover {
+            background: rgba(255,255,255,0.3);
+        }
+        
+        .stats-bar {
+            background: rgba(255,255,255,0.2);
+            padding: 15px 30px;
+            border-radius: 15px;
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+        
+        .stats-number {
+            font-size: 2em;
+            font-weight: bold;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 15px;
+            padding: 40px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        
+        .word-card {
+            text-align: center;
+            padding: 30px 0;
+        }
+        
+        .word {
+            font-size: 3em;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 20px;
+        }
+        
+        .review-count {
+            color: #f5576c;
+            font-size: 0.9em;
+            margin-bottom: 30px;
+        }
+        
+        .meaning {
+            font-size: 1.5em;
+            color: #f093fb;
+            margin-bottom: 20px;
+            display: none;
+        }
+        
+        .example {
+            color: #888;
+            font-style: italic;
+            margin-top: 20px;
+            display: none;
+        }
+        
+        .btn-group {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-top: 30px;
+        }
+        
+        .btn {
+            padding: 15px 40px;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 1.1em;
+            transition: all 0.3s;
+        }
+        
+        .btn-show {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .btn-remember {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            color: white;
+        }
+        
+        .btn-forget {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+        
+        .message {
+            text-align: center;
+            color: white;
+            font-size: 1.5em;
+            padding: 40px;
+        }
+        
+        .hidden {
+            display: none;
+        }
+        
+        .progress-ring {
+            width: 200px;
+            height: 200px;
+            margin: 0 auto 30px;
+        }
+        
+        .progress-ring circle {
+            transition: stroke-dashoffset 0.35s;
+            transform: rotate(-90deg);
+            transform-origin: 50% 50%;
+        }
+        
+        .progress-text {
+            font-size: 2em;
+            font-weight: bold;
+            fill: white;
+            text-anchor: middle;
+            dominant-baseline: middle;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/" class="back-btn">← 返回首页</a>
+        
+        <header>
+            <h1>📝 复习单词</h1>
+            <p>根据艾宾浩斯遗忘曲线</p>
+        </header>
+        
+        <div class="stats-bar">
+            <div class="stats-number" id="remaining-count">-</div>
+            <div>剩余待复习</div>
+        </div>
+        
+        <div class="card" id="word-card">
+            <div class="word-card">
+                <div class="word" id="word">加载中...</div>
+                <div class="review-count" id="review-count"></div>
+                <div class="meaning" id="meaning"></div>
+                <div class="example" id="example"></div>
+            </div>
+            
+            <div class="btn-group" id="btn-group">
+                <button class="btn btn-show" onclick="showMeaning()">显示释义</button>
+            </div>
+            
+            <div class="btn-group hidden" id="answer-group">
+                <button class="btn btn-forget" onclick="completeReview(false)">忘记了</button>
+                <button class="btn btn-remember" onclick="completeReview(true)">记住了</button>
+            </div>
+        </div>
+        
+        <div class="message hidden" id="complete-message">
+            🎉 太棒了！<br>
+            <p style="font-size: 0.8em; margin-top: 20px;">今天需要复习的单词已经完成！</p>
+            <a href="/" class="btn btn-show" style="margin-top: 20px; display: inline-block; text-decoration: none;">返回首页</a>
+        </div>
+    </div>
+    
+    <script>
+        let currentWord = null;
+        let reviewCount = 0;
+        let totalRemaining = 0;
+        
+        // 加载统计数据
+        async function loadStats() {
+            try {
+                const response = await fetch('/api/review/stats');
+                const stats = await response.json();
+                totalRemaining = stats.today;
+                document.getElementById('remaining-count').textContent = totalRemaining;
+            } catch (error) {
+                console.error('加载统计失败:', error);
+            }
+        }
+        
+        // 加载下一个复习单词
+        async function loadNextWord() {
+            try {
+                const response = await fetch('/api/review/next', {
+                    method: 'POST'
+                });
+                
+                const data = await response.json();
+                
+                if (data.message) {
+                    // 复习完了
+                    document.getElementById('word-card').style.display = 'none';
+                    document.getElementById('btn-group').style.display = 'none';
+                    document.getElementById('answer-group').classList.add('hidden');
+                    document.getElementById('complete-message').classList.remove('hidden');
+                    document.getElementById('remaining-count').textContent = '0';
+                    return;
+                }
+                
+                currentWord = data;
+                document.getElementById('word').textContent = data.word;
+                document.getElementById('review-count').textContent = `第 ${data.review_count + 1} 次复习`;
+                document.getElementById('meaning').textContent = data.meaning;
+                document.getElementById('example').textContent = data.example || '';
+                
+                // 重置显示状态
+                document.getElementById('meaning').style.display = 'none';
+                document.getElementById('example').style.display = 'none';
+                document.getElementById('btn-group').classList.remove('hidden');
+                document.getElementById('answer-group').classList.add('hidden');
+                
+            } catch (error) {
+                console.error('加载单词失败:', error);
+                document.getElementById('word').textContent = '加载失败';
+            }
+        }
+        
+        // 显示释义
+        function showMeaning() {
+            document.getElementById('meaning').style.display = 'block';
+            if (document.getElementById('example').textContent) {
+                document.getElementById('example').style.display = 'block';
+            }
+            document.getElementById('btn-group').classList.add('hidden');
+            document.getElementById('answer-group').classList.remove('hidden');
+        }
+        
+        // 完成复习
+        async function completeReview(remembered) {
+            if (!currentWord) return;
+            
+            try {
+                const response = await fetch('/api/review/complete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        word_id: currentWord.id,
+                        result: remembered ? 'remember' : 'forget'
+                    })
+                });
+                
+                if (response.ok) {
+                    reviewCount++;
+                    totalRemaining--;
+                    document.getElementById('remaining-count').textContent = totalRemaining;
+                    
+                    // 加载下一个单词
+                    loadNextWord();
+                }
+            } catch (error) {
+                console.error('保存复习记录失败:', error);
+            }
+        }
+        
+        // 页面加载时获取统计和第一个单词
+        loadStats();
+        loadNextWord();
+        
+        // 空格键显示释义
+        document.addEventListener('keydown', (e) => {
+            if (e.code === 'Space' && !document.getElementById('btn-group').classList.contains('hidden')) {
+                e.preventDefault();
+                showMeaning();
+            }
+        });
+    </script>
+</body>
+</html>

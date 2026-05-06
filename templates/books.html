@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📖 词书管理 - 背单词</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        
+        header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+        
+        header h1 {
+            font-size: 2em;
+            margin-bottom: 10px;
+        }
+        
+        .back-btn {
+            display: inline-block;
+            color: white;
+            text-decoration: none;
+            padding: 10px 20px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .back-btn:hover {
+            background: rgba(255,255,255,0.3);
+        }
+        
+        .card {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        
+        .create-form {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .create-form input {
+            flex: 1;
+            padding: 12px 20px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 1em;
+        }
+        
+        .create-form input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 1em;
+            transition: all 0.3s;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102,126,234,0.4);
+        }
+        
+        .btn-success {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            color: white;
+        }
+        
+        .btn-danger {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+        }
+        
+        .btn-sm {
+            padding: 8px 16px;
+            font-size: 0.9em;
+        }
+        
+        .book-list {
+            display: grid;
+            gap: 15px;
+        }
+        
+        .book-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            transition: all 0.3s;
+        }
+        
+        .book-item:hover {
+            background: #e9ecef;
+        }
+        
+        .book-info h3 {
+            margin-bottom: 5px;
+            color: #333;
+        }
+        
+        .book-info p {
+            color: #666;
+            font-size: 0.9em;
+        }
+        
+        .book-actions {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .import-section {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 2px solid #e0e0e0;
+        }
+        
+        .import-section h4 {
+            margin-bottom: 15px;
+            color: #333;
+        }
+        
+        .file-input {
+            margin-bottom: 10px;
+        }
+        
+        .help-text {
+            color: #666;
+            font-size: 0.9em;
+            margin-top: 10px;
+        }
+        
+        .message {
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .message.success {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .message.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/" class="back-btn">← 返回首页</a>
+        
+        <header>
+            <h1>📖 词书管理</h1>
+            <p>创建和管理你的词书</p>
+        </header>
+        
+        <div class="card">
+            <h2 style="margin-bottom: 20px;">创建新书</h2>
+            <div class="create-form">
+                <input type="text" id="book-name" placeholder="输入词书名称，如：四级词汇、托福核心...">
+                <button class="btn btn-primary" onclick="createBook()">创建</button>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h2 style="margin-bottom: 20px;">我的词书</h2>
+            <div class="book-list" id="book-list">
+                <p style="text-align: center; color: #666; padding: 40px;">加载中...</p>
+            </div>
+        </div>
+        
+        <div id="message" class="message" style="display: none;"></div>
+    </div>
+    
+    <script>
+        // 加载词书列表
+        async function loadBooks() {
+            try {
+                const response = await fetch('/api/books');
+                const books = await response.json();
+                
+                const bookList = document.getElementById('book-list');
+                
+                if (books.length === 0) {
+                    bookList.innerHTML = '<p style="text-align: center; color: #666; padding: 40px;">还没有词书，创建一个吧！📚</p>';
+                    return;
+                }
+                
+                bookList.innerHTML = books.map(book => `
+                    <div class="book-item">
+                        <div class="book-info">
+                            <h3>${book.name}</h3>
+                            <p>创建于 ${new Date(book.created_at).toLocaleDateString('zh-CN')}</p>
+                        </div>
+                        <div class="book-actions">
+                            <a href="/learn/${book.id}" class="btn btn-success btn-sm">开始学习</a>
+                            <button class="btn btn-primary btn-sm" onclick="showImport(${book.id})">导入单词</button>
+                            <button class="btn btn-primary btn-sm" onclick="showAiGenerate(${book.id})">✨ AI 生成例句</button>
+                            <button class="btn btn-danger btn-sm" onclick="deleteBook(${book.id})">删除</button>
+                        </div>
+                        <div class="import-section" id="import-${book.id}" style="display: none;">
+                            <h4>导入单词</h4>
+                            <p class="help-text">上传 CSV 文件，每行格式：单词，释义，例句（可选）</p>
+                            <input type="file" id="file-${book.id}" class="file-input" accept=".csv,.txt">
+                            <button class="btn btn-primary" onclick="importWords(${book.id})">上传</button>
+                        </div>
+                        <div class="import-section" id="ai-generate-${book.id}" style="display: none;">
+                            <h4>✨ AI 批量生成例句</h4>
+                            <p class="help-text">使用 DeepSeek AI 为词书中没有例句的单词自动生成例句</p>
+                            <p class="help-text" style="color: #677eea;">🚀 点击一次，后台自动分批生成全部例句（每批 10 个）</p>
+                            <p class="help-text" style="color: #999; font-size: 0.9em;">💡 生成过程中可以关闭页面，完成后会保存进度</p>
+                            <button class="btn btn-primary" onclick="aiGenerateExamples(${book.id})">开始生成</button>
+                            <div id="ai-result-${book.id}" style="margin-top: 15px;"></div>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('加载词书失败:', error);
+                showMessage('加载词书失败', 'error');
+            }
+        }
+        
+        // 创建新书
+        async function createBook() {
+            const name = document.getElementById('book-name').value.trim();
+            if (!name) {
+                showMessage('请输入词书名称', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/books', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name })
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showMessage(`词书"${name}"创建成功！`, 'success');
+                    document.getElementById('book-name').value = '';
+                    loadBooks();
+                } else {
+                    showMessage(result.error, 'error');
+                }
+            } catch (error) {
+                showMessage('创建失败', 'error');
+            }
+        }
+        
+        // 删除词书
+        async function deleteBook(bookId) {
+            if (!confirm('确定要删除这个词书吗？所有单词记录也会被删除！')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/books/${bookId}`, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    showMessage('词书已删除', 'success');
+                    loadBooks();
+                }
+            } catch (error) {
+                showMessage('删除失败', 'error');
+            }
+        }
+        
+        // 显示导入区域
+        function showImport(bookId) {
+            const section = document.getElementById(`import-${bookId}`);
+            section.style.display = section.style.display === 'none' ? 'block' : 'none';
+        }
+        
+        // 显示 AI 生成区域
+        function showAiGenerate(bookId) {
+            const section = document.getElementById(`ai-generate-${bookId}`);
+            section.style.display = section.style.display === 'none' ? 'block' : 'none';
+        }
+        
+        // AI 生成例句（一次性生成所有，后台慢慢处理）
+        async function aiGenerateExamples(bookId) {
+            const resultDiv = document.getElementById(`ai-result-${bookId}`);
+            const generateBtn = event.target;
+            
+            // 显示进度条
+            resultDiv.innerHTML = `
+                <div style="margin-top: 15px;">
+                    <p style="color: #667eea; margin-bottom: 10px;">🦋 正在后台生成例句，请稍候...</p>
+                    <div style="background: #e0e0e0; border-radius: 10px; height: 20px; overflow: hidden;">
+                        <div id="progress-bar-${bookId}" style="background: linear-gradient(90deg, #667eea, #764ba2); height: 100%; width: 0%; transition: width 0.3s;"></div>
+                    </div>
+                    <p id="progress-text-${bookId}" style="text-align: center; margin-top: 5px; font-size: 0.9em; color: #666;">0%</p>
+                    <p id="progress-status-${bookId}" style="text-align: center; margin-top: 5px; font-size: 0.85em; color: #888;">正在准备...</p>
+                </div>
+            `;
+            
+            // 禁用按钮
+            generateBtn.disabled = true;
+            generateBtn.textContent = '生成中...';
+            
+            try {
+                // 启动后台任务
+                const response = await fetch(`/api/books/${bookId}/ai-generate-all`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ batchMode: true })
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    if (result.total === 0) {
+                        resultDiv.innerHTML = '<p style="color: #38ef7d; margin-top: 15px;">✅ 所有单词都已有例句！</p>';
+                    } else {
+                        // 轮询进度
+                        const taskId = result.taskId;
+                        let lastProgress = 0;
+                        
+                        const pollInterval = setInterval(async () => {
+                            try {
+                                const statusResp = await fetch(`/api/books/${bookId}/ai-generate-status/${taskId}`);
+                                const status = await statusResp.json();
+                                
+                                // 更新进度条
+                                const progressBar = document.getElementById(`progress-bar-${bookId}`);
+                                const progressText = document.getElementById(`progress-text-${bookId}`);
+                                const progressStatus = document.getElementById(`progress-status-${bookId}`);
+                                
+                                if (progressBar && progressText) {
+                                    progressBar.style.width = `${status.progress}%`;
+                                    progressText.textContent = `${status.progress}% (${status.processed}/${status.total})`;
+                                }
+                                
+                                if (progressStatus) {
+                                    if (status.current_word) {
+                                        progressStatus.textContent = `正在生成：${status.current_word}...`;
+                                    } else if (status.status === 'completed') {
+                                        progressStatus.textContent = '✅ 完成！';
+                                    } else if (status.status === 'failed') {
+                                        progressStatus.textContent = `❌ 错误：${status.error}`;
+                                    }
+                                }
+                                
+                                // 检查是否完成
+                                if (status.status === 'completed' || status.status === 'failed') {
+                                    clearInterval(pollInterval);
+                                    generateBtn.disabled = false;
+                                    generateBtn.textContent = '开始生成';
+                                    
+                                    if (status.status === 'completed') {
+                                        setTimeout(() => {
+                                            resultDiv.innerHTML = `
+                                                <p style="color: #38ef7d; margin-top: 15px;">
+                                                    ✅ 完成！共生成 ${status.processed} 个例句！
+                                                </p>
+                                                <button class="btn btn-primary btn-sm" style="margin-top: 10px;" onclick="location.reload()">
+                                                    🔄 刷新查看结果
+                                                </button>
+                                            `;
+                                        }, 2000);
+                                    }
+                                }
+                            } catch (err) {
+                                console.error('轮询失败:', err);
+                            }
+                        }, 2000);
+                    }
+                } else {
+                    resultDiv.innerHTML = `<p style="color: #f5576c; margin-top: 15px;">❌ ${result.error}</p>`;
+                    generateBtn.disabled = false;
+                    generateBtn.textContent = '开始生成';
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<p style="color: #f5576c; margin-top: 15px;">❌ 请求失败：${error.message}</p>`;
+                generateBtn.disabled = false;
+                generateBtn.textContent = '开始生成';
+            }
+        }
+        
+        // 导入单词
+        async function importWords(bookId) {
+            const fileInput = document.getElementById(`file-${bookId}`);
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                showMessage('请选择文件', 'error');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            try {
+                const response = await fetch(`/api/books/${bookId}/import`, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showMessage(`导入成功！新增 ${result.imported} 个单词，跳过 ${result.duplicates} 个重复`, 'success');
+                    fileInput.value = '';
+                } else {
+                    showMessage(result.error, 'error');
+                }
+            } catch (error) {
+                showMessage('导入失败', 'error');
+            }
+        }
+        
+        // 显示消息
+        function showMessage(text, type) {
+            const messageEl = document.getElementById('message');
+            messageEl.textContent = text;
+            messageEl.className = `message ${type}`;
+            messageEl.style.display = 'block';
+            
+            setTimeout(() => {
+                messageEl.style.display = 'none';
+            }, 5000);
+        }
+        
+        // 页面加载时获取词书列表
+        loadBooks();
+    </script>
+</body>
+</html>

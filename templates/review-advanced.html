@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>📝 复习单词 - 背单词</title>
+    <!-- 缓存破坏：每次修改后更新时间戳 -->
+    <meta name="version" content="2026-05-04-0205">
+    
+
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            min-height: 100vh; padding: 20px;
+        }
+        .container { max-width: 600px; margin: 0 auto; }
+        header { text-align: center; color: white; margin-bottom: 30px; }
+        header h1 { font-size: 2em; margin-bottom: 10px; }
+        .back-btn {
+            display: inline-block; color: white; text-decoration: none;
+            padding: 10px 20px; background: rgba(255,255,255,0.2);
+            border-radius: 20px; margin-bottom: 20px;
+        }
+        .back-btn:hover { background: rgba(255,255,255,0.3); }
+        .stats-bar {
+            background: rgba(255,255,255,0.2); padding: 15px 30px;
+            border-radius: 15px; text-align: center; color: white; margin-bottom: 30px;
+        }
+        .stats-number { font-size: 2em; font-weight: bold; }
+        .card {
+            background: white; border-radius: 15px; padding: 40px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        .word-card { text-align: center; padding: 30px 0; }
+        .word { font-size: 3em; font-weight: bold; color: #333; margin-bottom: 20px; }
+        .review-count { color: #f5576c; font-size: 0.9em; margin-bottom: 30px; }
+        .meaning { font-size: 1.5em; color: #f093fb; margin-bottom: 20px; display: none; }
+        .example { color: #888; font-style: italic; margin-top: 20px; display: none; }
+        .btn-group { display: flex; gap: 15px; justify-content: center; margin-top: 30px; }
+        .btn {
+            padding: 15px 40px; border: none; border-radius: 10px;
+            cursor: pointer; font-size: 1.1em; transition: all 0.3s;
+        }
+        .btn-show { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
+        .btn-forget { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; }
+        .btn-remember { background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: white; }
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.2); }
+        .message { text-align: center; color: white; font-size: 1.5em; padding: 40px; }
+        .hidden { display: none; }
+        
+        /* 拼写输入框 */
+        .spelling-input {
+            width: 100%; padding: 15px; font-size: 1.2em;
+            border: 2px solid #e0e0e0; border-radius: 10px;
+            margin-top: 20px; text-align: center;
+            word-wrap: break-word; overflow-wrap: break-word;
+            box-sizing: border-box; background: white; cursor: text;
+        }
+        .spelling-input:focus { outline: none; border-color: #667eea; }
+        .spelling-input:empty:before { content: attr(placeholder); color: #999; }
+        
+        /* 进度提示 */
+        .interval-progress {
+            background: rgba(76, 175, 80, 0.1);
+            border: 2px solid #4CAF50;
+            border-radius: 10px; padding: 15px;
+            margin-top: 20px; text-align: center;
+            color: #2E7D32; font-weight: bold;
+        }
+        
+        /* 反馈信息 */
+        .feedback {
+            text-align: center; padding: 20px; margin-top: 20px;
+            border-radius: 10px; font-size: 1.2em;
+        }
+        .feedback.correct { background: #d4edda; color: #155724; }
+        .feedback.wrong { background: #f8d7da; color: #721c24; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/" class="back-btn">← 返回首页</a>
+        
+        <header>
+            <h1>📝 复习单词</h1>
+            <p>间隔 15 词 + 拼写验证</p>
+        </header>
+        
+        <div class="stats-bar">
+            <div class="stats-number" id="remaining-count">-</div>
+            <div>剩余待复习</div>
+        </div>
+        
+        <div class="card" id="word-card">
+            <div class="word-card">
+                <div class="word" id="word">加载中...</div>
+                <div class="review-count" id="review-count"></div>
+                <div class="interval-progress hidden" id="interval-progress">
+                    已间隔 <span id="interval-count">0</span>/15 词，再学习 <span id="interval-remaining">15</span> 词后进入拼写
+                </div>
+                <div class="meaning" id="meaning"></div>
+                <div class="example" id="example"></div>
+            </div>
+            
+            <!-- 阶段 1: 显示释义 -->
+            <div class="btn-group" id="btn-group-stage1">
+                <button class="btn btn-show" id="btn-show-meaning">显示释义</button>
+            </div>
+            
+            <!-- 阶段 2: 选择记住了/忘记了 -->
+            <div class="btn-group hidden" id="btn-group-stage2">
+                <button class="btn btn-forget" id="btn-forget">忘记了</button>
+                <button class="btn btn-remember" id="btn-remember">记住了</button>
+            </div>
+            
+            <!-- 阶段 3: 拼写 -->
+            <div class="btn-group hidden" id="btn-group-spelling">
+                <div class="spelling-input" id="spelling-input" contenteditable="true" placeholder="根据释义拼写单词..."></div>
+                <button class="btn btn-remember" style="margin-top: 15px;" id="btn-submit-spelling">提交</button>
+            </div>
+            
+            <!-- 反馈 -->
+            <div class="feedback hidden" id="feedback"></div>
+        </div>
+        
+        <div class="message hidden" id="complete-message">
+            🎉 太棒了！<br>
+            <p style="font-size: 0.8em; margin-top: 20px;">今天需要复习的单词已经完成！</p>
+            <a href="/" class="btn btn-show" style="margin-top: 20px; display: inline-block; text-decoration: none;">返回首页</a>
+        </div>
+    </div>
+    
+    <script>
+        let currentWord = null;
+        let reviewCount = 0;
+        let totalRemaining = 0;
+        let intervalCounter = 0; // 间隔计数器
+        const INTERVAL_TARGET = 15; // 间隔 15 词
+        
+        // 加载统计数据
+        async function loadStats() {
+            try {
+                const response = await fetch('/api/review/stats');
+                if (!response.ok) {
+                    throw new Error('HTTP ' + response.status);
+                }
+                const stats = await response.json();
+                totalRemaining = stats.today || stats.remaining || 0;
+                document.getElementById('remaining-count').textContent = totalRemaining;
+            } catch (error) {
+                throw error;
+            }
+        }
+        
+        // 加载下一个复习单词
+        async function loadNextWord() {
+            try {
+                const response = await fetch('/api/review/next', {
+                    method: 'POST'
+                });
+                
+                if (!response.ok) {
+                    throw new Error('HTTP ' + response.status);
+                }
+                
+                const data = await response.json();
+                
+                // 检查是否是错误响应
+                if (data.error) {
+                    document.getElementById('word').textContent = '错误：' + data.error;
+                    return;
+                }
+                
+                if (data.message) {
+                    // 复习完了 - 检查是否需要进入拼写阶段
+                    if (intervalCounter > 0 && intervalCounter < INTERVAL_TARGET && totalRemaining > 0) {
+                        // 还有单词但间隔未满，继续循环
+                        loadNextWord();
+                        return;
+                    } else if (intervalCounter > 0) {
+                        // 间隔已满，进入拼写阶段 - 隐藏单词，只显示释义
+                        document.getElementById('word').textContent = '请根据释义拼写:';
+                        document.getElementById('meaning').style.display = 'block';
+                        document.getElementById('example').style.display = 'block';
+                        document.getElementById('btn-group-stage2').classList.add('hidden');
+                        document.getElementById('btn-group-spelling').classList.remove('hidden');
+                        document.getElementById('spelling-input').textContent = '';
+                        setTimeout(() => {
+                            const input = document.getElementById('spelling-input');
+                            input.focus();
+                            input.click();
+                        }, 300);
+                        return;
+                    } else {
+                        // 真的复习完了
+                        document.getElementById('word-card').style.display = 'none';
+                        document.getElementById('btn-group-stage1').classList.add('hidden');
+                        document.getElementById('btn-group-stage2').classList.add('hidden');
+                        document.getElementById('btn-group-spelling').classList.add('hidden');
+                        document.getElementById('complete-message').classList.remove('hidden');
+                        document.getElementById('remaining-count').textContent = '0';
+                        return;
+                    }
+                }
+                
+                currentWord = data;
+                // 只有在新单词时才重置间隔计数器
+                if (!data.is_repeat) {
+                    intervalCounter = 0;
+                }
+                updateIntervalDisplay();
+                
+                document.getElementById('word').textContent = data.word;
+                document.getElementById('review-count').textContent = `第 ${data.review_count + 1} 次复习`;
+                document.getElementById('meaning').textContent = data.meaning;
+                document.getElementById('example').textContent = data.example || '';
+                
+                // 重置显示状态
+                document.getElementById('meaning').style.display = 'none';
+                document.getElementById('example').style.display = 'none';
+                document.getElementById('btn-group-stage1').classList.remove('hidden');
+                document.getElementById('btn-group-stage2').classList.add('hidden');
+                document.getElementById('btn-group-spelling').classList.add('hidden');
+                document.getElementById('feedback').classList.add('hidden');
+                
+            } catch (error) {
+                console.error('加载单词失败:', error);
+                document.getElementById('word').textContent = '加载失败：' + error.message;
+                document.getElementById('meaning').textContent = '请刷新页面重试';
+            }
+        }
+        
+        // 更新间隔显示
+        function updateIntervalDisplay() {
+            const progress = document.getElementById('interval-progress');
+            if (intervalCounter > 0 && intervalCounter < INTERVAL_TARGET) {
+                progress.classList.remove('hidden');
+                document.getElementById('interval-count').textContent = intervalCounter;
+                document.getElementById('interval-remaining').textContent = INTERVAL_TARGET - intervalCounter;
+            } else {
+                progress.classList.add('hidden');
+            }
+        }
+        
+        // 显示释义
+        function showMeaning() {
+            document.getElementById('meaning').style.display = 'block';
+            if (document.getElementById('example').textContent) {
+                document.getElementById('example').style.display = 'block';
+            }
+            document.getElementById('btn-group-stage1').classList.add('hidden');
+            document.getElementById('btn-group-stage2').classList.remove('hidden');
+        }
+        
+        // 完成复习（记住了/忘记了）
+        async function completeReview(remembered) {
+            if (!currentWord) return;
+            
+            if (remembered) {
+                // 记住了 → 先更新后端，再更新前端
+                try {
+                    await fetch('/api/review/complete', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ word_id: currentWord.id, result: 'remember' })
+                    });
+                } catch (err) {
+                    console.error('更新复习状态失败:', err);
+                }
+                
+                // 更新重学队列的间隔计数
+                fetch('/api/review/update-intervals', {
+                    method: 'POST'
+                }).catch(err => console.error('更新间隔失败:', err));
+                
+                intervalCounter++;
+                totalRemaining--;
+                document.getElementById('remaining-count').textContent = totalRemaining;
+                
+                // 判断是否进入拼写阶段：
+                // 1. 间隔满 15 词
+                // 2. 剩余单词 <= 1（学完了或只剩 1 个）
+                const shouldSpell = intervalCounter >= INTERVAL_TARGET || totalRemaining <= 1;
+                
+                if (shouldSpell) {
+                    // 间隔已到 → 进入拼写阶段，隐藏单词显示释义
+                    document.getElementById('word').textContent = '请根据释义拼写:';
+                    document.getElementById('meaning').textContent = currentWord.meaning;
+                    document.getElementById('meaning').style.display = 'block';
+                    document.getElementById('example').textContent = currentWord.example || '';
+                    if (currentWord.example) {
+                        document.getElementById('example').style.display = 'block';
+                    }
+                    document.getElementById('btn-group-stage2').classList.add('hidden');
+                    document.getElementById('btn-group-spelling').classList.remove('hidden');
+                    document.getElementById('spelling-input').textContent = '';
+                    // 显示提示
+                    alert('间隔已满！现在进入拼写阶段！📝');
+                    setTimeout(() => {
+                        const input = document.getElementById('spelling-input');
+                        input.focus();
+                        input.click();
+                    }, 300);
+                } else {
+                    // 继续下一个单词
+                    updateIntervalDisplay();
+                    loadNextWord();
+                }
+            } else {
+                // 忘记了 → 加入重学队列，间隔 15 个单词后重新复习
+                // 1. 不减少 totalRemaining
+                // 2. 不增加 intervalCounter
+                // 3. 调用后端 API 加入重学队列
+                // 4. 加载下一个单词
+                
+                // 调用后端 API，加入重学队列
+                fetch('/api/review/forget', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ word_id: currentWord.id })
+                }).catch(err => console.error('加入重学队列失败:', err));
+                
+                // 更新其他重学单词的间隔计数
+                fetch('/api/review/update-intervals', {
+                    method: 'POST'
+                }).catch(err => console.error('更新间隔失败:', err));
+                
+                alert('没关系，我们再学 15 个单词后复习这个单词！加油！💪');
+                
+                // 加载下一个单词
+                loadNextWord();
+            }
+        }  // ✅ 修复：添加缺失的闭合大括号
+        
+        // 提交拼写
+        async function submitSpelling() {
+            const input = document.getElementById('spelling-input');
+            const userAnswer = input.textContent.trim();
+            
+            if (!userAnswer) {
+                alert('请输入单词拼写！');
+                input.focus();
+                return;
+            }
+            
+            const isCorrect = userAnswer.toLowerCase() === currentWord.word.toLowerCase();
+            
+            // 提交到后端
+            const response = await fetch('/api/review/spelling', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    word_id: currentWord.id,
+                    answer: userAnswer,
+                    correct: currentWord.word
+                })
+            });
+            
+            const result = await response.json();
+            
+            if (isCorrect) {
+                showFeedback('✅ 拼写正确！复习完成！', true);
+                setTimeout(() => {
+                    // 检查是否还有剩余单词
+                    if (totalRemaining > 0) {
+                        loadNextWord();
+                    } else {
+                        // 所有单词都完成拼写
+                        document.getElementById('word-card').style.display = 'none';
+                        document.getElementById('btn-group-spelling').classList.add('hidden');
+                        document.getElementById('complete-message').classList.remove('hidden');
+                    }
+                }, 1500);
+            } else {
+                showFeedback(`❌ 正确拼写：${currentWord.word}`, false);
+                // 拼写错误 → 重置艾宾浩斯曲线，明天还会出现
+                await fetch('/api/review/reset', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ word_id: currentWord.id })
+                });
+                
+                // 显示"继续"按钮
+                const continueBtn = document.createElement('button');
+                continueBtn.className = 'btn btn-remember';
+                continueBtn.textContent = '继续';
+                continueBtn.style.marginTop = '15px';
+                continueBtn.onclick = () => {
+                    document.getElementById('feedback').classList.add('hidden');
+                    continueBtn.remove();
+                    totalRemaining--;
+                    document.getElementById('remaining-count').textContent = totalRemaining;
+                    
+                    if (totalRemaining > 0) {
+                        loadNextWord();
+                    } else {
+                        document.getElementById('word-card').style.display = 'none';
+                        document.getElementById('btn-group-spelling').classList.add('hidden');
+                        document.getElementById('complete-message').classList.remove('hidden');
+                    }
+                };
+                document.getElementById('feedback').appendChild(continueBtn);
+            }
+        }
+        
+        // 显示反馈
+        function showFeedback(text, isCorrect) {
+            const fb = document.getElementById('feedback');
+            fb.textContent = text;
+            fb.className = 'feedback ' + (isCorrect ? 'correct' : 'wrong');
+            fb.classList.remove('hidden');
+        }
+        
+        // 全局错误捕获
+        window.addEventListener('error', function(e) {
+            if (document.getElementById('word')) {
+                document.getElementById('word').textContent = '加载失败，请刷新重试';
+            }
+        });
+        
+        // 绑定按钮事件监听器
+        function bindEvents() {
+            // 显示释义按钮
+            const showMeaningBtn = document.getElementById('btn-show-meaning');
+            if (showMeaningBtn) {
+                showMeaningBtn.addEventListener('click', showMeaning);
+            }
+            
+            // 忘记了按钮
+            const forgetBtn = document.getElementById('btn-forget');
+            if (forgetBtn) {
+                forgetBtn.addEventListener('click', function() { completeReview(false); });
+            }
+            
+            // 记住了按钮
+            const rememberBtn = document.getElementById('btn-remember');
+            if (rememberBtn) {
+                rememberBtn.addEventListener('click', function() { completeReview(true); });
+            }
+            
+            // 提交拼写按钮
+            const submitSpellingBtn = document.getElementById('btn-submit-spelling');
+            if (submitSpellingBtn) {
+                submitSpellingBtn.addEventListener('click', submitSpelling);
+            }
+        }
+        
+        // 页面加载
+        async function init() {
+            try {
+                await loadStats();  // 先加载统计
+                
+                // 检查 totalRemaining 是否有效
+                if (!totalRemaining || totalRemaining <= 0) {
+                    document.getElementById('word').textContent = '今天没有需要复习的单词！';
+                    document.getElementById('meaning').textContent = '去学习新单词吧～';
+                    document.getElementById('btn-group-stage1').classList.add('hidden');
+                    return;
+                }
+                
+                bindEvents();       // 绑定按钮事件
+                loadNextWord();     // 再加载单词
+            } catch (error) {
+                document.getElementById('word').textContent = '加载失败，请刷新重试';
+            }
+        }
+        // 页面加载
+        (function() {
+            // DOM 加载完成后初始化
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', function() {
+                    init();
+                });
+            } else {
+                // DOM 已经加载完成，直接初始化
+                setTimeout(function() {
+                    init();
+                }, 100);
+            }
+        })();
+    </script>
+</body>
+</html>
