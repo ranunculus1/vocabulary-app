@@ -18,7 +18,11 @@ import urllib.request
 import ssl
 
 app = Flask(__name__)
-DB_PATH = os.path.join(os.path.dirname(__file__), 'vocabulary.db')
+# Vercel Serverless 环境下使用绝对路径
+if os.environ.get('VERCEL'):
+    DB_PATH = '/var/task/vocabulary.db'
+else:
+    DB_PATH = os.path.join(os.path.dirname(__file__), 'vocabulary.db')
 
 # 艾宾浩斯遗忘曲线复习间隔（天）
 # 第 1 次：1 天，第 2 次：2 天，第 3 次：4 天，第 4 次：7 天，第 5 次：15 天，第 6 次：30 天，第 7 次：60 天，第 8 次：90 天
