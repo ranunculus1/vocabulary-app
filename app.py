@@ -1067,14 +1067,25 @@ def get_generate_status(book_id, task_id):
     })
 
 if __name__ == '__main__':
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--port', type=int, default=5000)
+    parser.add_argument('--host', type=str, default='0.0.0.0')
+    args = parser.parse_args()
+    
     # 创建模板目录
     os.makedirs('templates', exist_ok=True)
     
     # 初始化数据库
     init_db()
     
-    print("\n📚 背单词网站启动中...")
-    print("🌐 访问地址：http://localhost:5000")
-    print("\n按 Ctrl+C 停止服务\n")
+    port = args.port
+    # Hugging Face Spaces 环境变量
+    if os.environ.get('HF_SPACE_ID'):
+        port = 7860
     
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    print(f"\n📚 背单词网站启动中...")
+    print(f"🌐 访问地址：http://{args.host}:{port}")
+    print(f"\n按 Ctrl+C 停止服务\n")
+    
+    app.run(host=args.host, port=port, debug=False)
