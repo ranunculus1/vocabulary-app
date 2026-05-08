@@ -620,10 +620,12 @@ def update_review_intervals():
     cursor = conn.cursor()
     
     # 所有重学队列的单词间隔计数 +1
+    # 确保只更新 stage >= 1 的记录（进行中的单词）
     cursor.execute('''
         UPDATE learning_progress 
         SET words_since_stage = words_since_stage + 1
         WHERE word_id IN (SELECT word_id FROM relearn_queue)
+          AND stage >= 1
     ''')
     
     conn.commit()
@@ -644,17 +646,36 @@ def forget_word():
     cursor = conn.cursor()
     
     try:
+        # 获取 book_id
+        cursor.execute('SELECT book_id FROM words WHERE id = ?', (word_id,))
+        row = cursor.fetchone()
+        if not row:
+            conn.close()
+            return jsonify({'error': '单词不存在'}), 404
+        book_id = row['book_id']
+        
         # 1. 加入待重学队列（如果不存在）
         cursor.execute('''
             INSERT OR IGNORE INTO relearn_queue (word_id, book_id)
-            VALUES (?, (SELECT book_id FROM words WHERE id = ?))
-        ''', (word_id, word_id))
+            VALUES (?, ?)
+        ''', (word_id, book_id))
         
-        # 2. 更新 learning_progress，设置间隔计数器为 0
-        cursor.execute('''
-            INSERT OR REPLACE INTO learning_progress (word_id, book_id, stage, words_since_stage, last_practiced_at)
-            VALUES (?, (SELECT book_id FROM words WHERE id = ?), 1, 0, ?)
-        ''', (word_id, word_id, datetime.now()))
+        # 2. 确保 learning_progress 记录存在，设置间隔计数器为 0
+        # 先检查是否存在
+        cursor.execute('SELECT id FROM learning_progress WHERE word_id = ?', (word_id,))
+        if cursor.fetchone():
+            # 存在则更新
+            cursor.execute('''
+                UPDATE learning_progress 
+                SET stage = 1, words_since_stage = 0, last_practiced_at = ?
+                WHERE word_id = ?
+            ''', (datetime.now(), word_id))
+        else:
+            # 不存在则插入
+            cursor.execute('''
+                INSERT INTO learning_progress (word_id, book_id, stage, words_since_stage, last_practiced_at)
+                VALUES (?, ?, 1, 0, ?)
+            ''', (word_id, book_id, datetime.now()))
         
         conn.commit()
         conn.close()
@@ -722,13 +743,14 @@ def get_next_review():
     now = datetime.now()
     
     # 1. 优先从重学队列获取（忘记了的单词，间隔已满 15 个）
+    # 修复：去掉 IS NULL 条件，只返回间隔已满的单词
     cursor.execute('''
         SELECT w.id, w.word, w.meaning, w.example,
-               lp.words_since_stage, 'relearn' as type
+               COALESCE(lp.words_since_stage, 0) as words_since_stage, 'relearn' as type
         FROM relearn_queue rq
         JOIN words w ON rq.word_id = w.id
         LEFT JOIN learning_progress lp ON rq.word_id = lp.word_id
-        WHERE (lp.words_since_stage IS NULL OR lp.words_since_stage >= 15)
+        WHERE COALESCE(lp.words_since_stage, 0) >= 15
         ORDER BY rq.added_at
         LIMIT 1
     ''')
